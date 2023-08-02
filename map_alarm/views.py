@@ -1,56 +1,68 @@
 # views.py
 
-import json, requests
-from urllib.parse import urlencode, quote_plus
-from django.http import HttpResponse
+from django.http import JsonResponse
 from django.contrib.gis.geos import GEOSGeometry
-from django.contrib.gis.geos import Polygon, MultiPolygon
-
+import asyncio
+import aiohttp
+from urllib.parse import urlencode,quote_plus
+from asgiref.sync import sync_to_async
 from .models import Accidents
 
-def bohang_db(request):
-    # Update the serviceKeyDecoded variable with your actual API key
-    serviceKeyDecoded = "+THWNzZCVM8HYbGFp8GV2CPZjPEqQ+SqehbMQoQDEmuW7lR9JNUYwJtx3tolZ39qkQVZg0JgKrf3GAsaluhhEg=="
+async def fetch_data_from_api(session, url, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns):
+    for guGun in guGuns:
+        for searchYearCd in range(2013, 2024):
+            queryParams = '?' + urlencode({
+                quote_plus('ServiceKey'): serviceKeyDecoded,
+                quote_plus('siDo'): siDo,
+                quote_plus('guGun'): guGun,
+                quote_plus('numOfRows'): numOfRows,
+                quote_plus('pageNo'): pageNo,
+                quote_plus('type'): type_,
+                quote_plus('searchYearCd'): searchYearCd
+            })
 
-    url = "http://apis.data.go.kr/B552061/frequentzoneChild/getRestFrequentzoneChild"
+            async with session.get(url + queryParams) as res:
+                if res.status == 200:
+                    data = await res.json()
+                    if "items" in data and "item" in data["items"]:
+                        items = data["items"]["item"]
+
+                        for item in items:
+                            geom_json = item["geom_json"]
+                            name = item["spot_nm"]
+                            region = GEOSGeometry(geom_json)
+
+                            try:
+                                polygon_obj = await sync_to_async(Accidents.objects.get)(name=name)
+                                polygon_obj.region = region
+                                await sync_to_async(polygon_obj.save)()
+                            except Accidents.DoesNotExist:
+                                polygon_obj = await sync_to_async(Accidents)(name=name, region=region)
+                                await sync_to_async(polygon_obj.save)()
+
+                else:
+                    return JsonResponse({"message": "Failed to fetch data from the API.", "status": "error"})
+
+    return True
+
+async def fetch_data_from_apis(request):
+    serviceKeyDecoded = "+THWNzZCVM8HYbGFp8GV2CPZjPEqQ+SqehbMQoQDEmuW7lR9JNUYwJtx3tolZ39qkQVZg0JgKrf3GAsaluhhEg=="
+    url_bohang = "http://apis.data.go.kr/B552061/frequentzoneChild/getRestFrequentzoneChild"
+    url_schoolzone = "http://apis.data.go.kr/B552061/schoolzoneChild/getRestSchoolzoneChild"
     siDo = "11"
-    guGun = "710"
-    searchYearCd = "2019"
     type_ = "json"
     numOfRows = "100"
     pageNo = "1"
 
-    queryParams = '?' + urlencode({
-        quote_plus('ServiceKey'): serviceKeyDecoded,
-        quote_plus('siDo'): siDo,
-        quote_plus('guGun'): guGun,
-        quote_plus('numOfRows'): numOfRows,
-        quote_plus('pageNo'): pageNo,
-        quote_plus('type'): type_,
-        quote_plus('searchYearCd'): searchYearCd
-    })
+    guGuns = ["710", "590"]
 
-    res = requests.get(url + queryParams)
-    data = res.json()
+    async with aiohttp.ClientSession() as session:
+        tasks = [
+            fetch_data_from_api(session, url_bohang, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns),
+            fetch_data_from_api(session, url_schoolzone, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns)
+        ]
+        results = await asyncio.gather(*tasks)
 
-    for item in data['items']['item']:
-        # Get the JSON data for the polygon
-        polygon_json = item['geom_json']
+    # Process the results if needed
 
-        # Load the JSON data to a Python dictionary
-        polygon_data = json.loads(polygon_json)
-
-        # Extract the coordinates from the JSON data
-        coordinates = polygon_data['coordinates'][0]
-
-        # Convert the coordinates to a Polygon object
-        region = Polygon(coordinates)
-        print(region)
-        # Save the data to the database
-        spot_name = item['spot_nm']
-        accident = Accidents(region=region.wkt, name=spot_name)
-        accident.save()
-
-
-    # Return a response to indicate that the data has been fetched and saved
-    return HttpResponse("Data fetched and saved successfully.")
+    return JsonResponse({"message": "Data imported successfully.", "status": "success"})
