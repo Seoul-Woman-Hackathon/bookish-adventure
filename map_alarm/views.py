@@ -1,12 +1,16 @@
 # views.py
 
 from django.http import JsonResponse
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import GEOSGeometry, Point
 import asyncio
 import aiohttp
 from urllib.parse import urlencode,quote_plus
 from asgiref.sync import sync_to_async
-from .models import Accidents
+from .models import Accidents,Lights
+import requests
+from django.shortcuts import HttpResponse
+
+serviceKeyDecoded = "+THWNzZCVM8HYbGFp8GV2CPZjPEqQ+SqehbMQoQDEmuW7lR9JNUYwJtx3tolZ39qkQVZg0JgKrf3GAsaluhhEg=="
 
 async def fetch_data_from_api(session, url, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns):
     for guGun in guGuns:
@@ -46,7 +50,6 @@ async def fetch_data_from_api(session, url, serviceKeyDecoded, siDo, type_, numO
     return True
 
 async def fetch_data_from_apis(request):
-    serviceKeyDecoded = "+THWNzZCVM8HYbGFp8GV2CPZjPEqQ+SqehbMQoQDEmuW7lR9JNUYwJtx3tolZ39qkQVZg0JgKrf3GAsaluhhEg=="
     url_bohang = "http://apis.data.go.kr/B552061/frequentzoneChild/getRestFrequentzoneChild"
     url_schoolzone = "http://apis.data.go.kr/B552061/schoolzoneChild/getRestSchoolzoneChild"
     siDo = "11"
@@ -66,3 +69,53 @@ async def fetch_data_from_apis(request):
     # Process the results if needed
 
     return JsonResponse({"message": "Data imported successfully.", "status": "success"})
+
+
+def save_crosswalk_data(request):
+    url = "http://apis.data.go.kr/3190000/CrossWalkService/getCrossWalkList"
+
+    params = {
+        "serviceKey": serviceKeyDecoded,
+        "pageNo": "1",
+        "numOfRows": "1000",  # Set the number of rows you want to fetch
+    }
+
+    response = requests.get(url, params=params)
+
+    if response.status_code == 200:
+        data = response.json()
+        if "body" in data:
+            crosswalks = data["body"]
+            for crosswalk in crosswalks:
+                try:
+                    latitude = crosswalk["LAT"]
+                    longitude = crosswalk["LOT"]
+                    road_address = crosswalk["LCTN_ROAD_NM_ADDR"]
+
+                    # Convert latitude and longitude to a Point object
+                    point = Point(longitude, latitude)
+
+                    # Check if the point falls within any of the regions' polygons
+                    regions = Accidents.objects.filter(region__contains=point)
+                    if regions.exists():
+                        # Get the first matching region (assuming there is only one)
+                        region = regions.first()
+
+                        # Check if the record with the given latitude and longitude already exists for the region
+                        # If not, save it to the database
+                        Lights.objects.get_or_create(
+                            latitude=latitude,
+                            longitude=longitude,
+                            name=road_address,
+                            accidents_idaccidents=region,
+                        )
+
+                except KeyError:
+                    # Handle the case where the required fields are missing
+                    pass
+
+            return HttpResponse("Data saved successfully.")
+        else:
+            return HttpResponse("No data found in the response.")
+    else:
+        return HttpResponse("Failed to fetch data from the API.")

@@ -6,7 +6,7 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.contrib.gis.db import models
-from django.contrib.gis.db.models import PolygonField
+
 
 class User(models.Model):
     iduser = models.AutoField(primary_key=True)
@@ -27,11 +27,11 @@ class User(models.Model):
 
 class Accidents(models.Model):
     idaccidents = models.AutoField(primary_key=True)
-    region = models.PolygonField(blank=True, null=True)  # This field type is a guess.
+    region = models.PolygonField(blank=True, null=True)
     name = models.CharField(max_length=45, blank=True, null=True)
 
     class Meta:
-        # managed = False
+        #managed = False
         db_table = 'accidents'
 
 
@@ -164,8 +164,8 @@ class Guardian(models.Model):
 
 class Lights(models.Model):
     idlights = models.AutoField(primary_key=True)
-    latitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
-    longitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
     name = models.CharField(max_length=45, blank=True, null=True)
     accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='accidents_idaccidents')
 
