@@ -5,52 +5,17 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
-from django.db import models
-
-
-class Accidents(models.Model):
-    idaccidents = models.IntegerField(db_column='idAccidents', primary_key=True)  # Field name made lowercase.
-    region = models.TextField(blank=True, null=True)  # This field type is a guess.
-    name = models.CharField(max_length=45, blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'Accidents'
-
-
-class Guardian(models.Model):
-    idguardian = models.IntegerField(db_column='idGuardian', primary_key=True)  # Field name made lowercase.
-    name = models.CharField(max_length=45, blank=True, null=True)
-    phonenum = models.CharField(max_length=45, blank=True, null=True)
-    user_iduser = models.ForeignKey('User', models.DO_NOTHING, db_column='User_idUser')  # Field name made lowercase.
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'Guardian'
-
-
-class Lights(models.Model):
-    idlights = models.IntegerField(db_column='idLights', primary_key=True)  # Field name made lowercase.
-    latitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
-    longitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
-    name = models.CharField(max_length=45, blank=True, null=True)
-    accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='Accidents_idAccidents')  # Field name made lowercase.
-
-    class Meta:
-        managed = False
-        db_table = 'Lights'
-
+from django.contrib.gis.db import models
+from django.contrib.gis.db.models import PolygonField
 
 class User(models.Model):
-    iduser = models.IntegerField(db_column='idUser', primary_key=True)  # Field name made lowercase.
+    iduser = models.AutoField(primary_key=True)
     name = models.CharField(max_length=45)
     email = models.CharField(max_length=45)
     birthdate = models.DateTimeField()
     phonenum = models.CharField(max_length=45)
     count = models.IntegerField(blank=True, null=True)
-    pic = models.TextField(blank=True, null=True)
+    pic = models.BinaryField(blank=True, null=True)
     password = models.CharField(max_length=45)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
@@ -60,14 +25,14 @@ class User(models.Model):
         db_table = 'User'
 
 
-class UserHasAccidents(models.Model):
-    user_iduser = models.OneToOneField(User, models.DO_NOTHING, db_column='User_idUser', primary_key=True)  # Field name made lowercase. The composite primary key (User_idUser, Accidents_idAccidents) found, that is not supported. The first column is selected.
-    accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='Accidents_idAccidents')  # Field name made lowercase.
+class Accidents(models.Model):
+    idaccidents = models.AutoField(primary_key=True)
+    region = models.PolygonField(blank=True, null=True)  # This field type is a guess.
+    name = models.CharField(max_length=45, blank=True, null=True)
 
     class Meta:
-        managed = False
-        db_table = 'User_has_Accidents'
-        unique_together = (('user_iduser', 'accidents_idaccidents'),)
+        # managed = False
+        db_table = 'accidents'
 
 
 class AuthGroup(models.Model):
@@ -103,13 +68,13 @@ class AuthPermission(models.Model):
 class AuthUser(models.Model):
     password = models.CharField(max_length=128)
     last_login = models.DateTimeField(blank=True, null=True)
-    is_superuser = models.IntegerField()
+    is_superuser = models.BooleanField()
     username = models.CharField(unique=True, max_length=150)
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
     email = models.CharField(max_length=254)
-    is_staff = models.IntegerField()
-    is_active = models.IntegerField()
+    is_staff = models.BooleanField()
+    is_active = models.BooleanField()
     date_joined = models.DateTimeField()
 
     class Meta:
@@ -143,7 +108,7 @@ class DjangoAdminLog(models.Model):
     action_time = models.DateTimeField()
     object_id = models.TextField(blank=True, null=True)
     object_repr = models.CharField(max_length=200)
-    action_flag = models.PositiveSmallIntegerField()
+    action_flag = models.SmallIntegerField()
     change_message = models.TextField()
     content_type = models.ForeignKey('DjangoContentType', models.DO_NOTHING, blank=True, null=True)
     user = models.ForeignKey(AuthUser, models.DO_NOTHING)
@@ -172,3 +137,48 @@ class DjangoMigrations(models.Model):
     class Meta:
         managed = False
         db_table = 'django_migrations'
+
+
+class DjangoSession(models.Model):
+    session_key = models.CharField(primary_key=True, max_length=40)
+    session_data = models.TextField()
+    expire_date = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = 'django_session'
+
+
+class Guardian(models.Model):
+    idguardian = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=45, blank=True, null=True)
+    phonenum = models.CharField(max_length=45, blank=True, null=True)
+    user_iduser = models.IntegerField()
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'guardian'
+
+
+class Lights(models.Model):
+    idlights = models.AutoField(primary_key=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
+    name = models.CharField(max_length=45, blank=True, null=True)
+    accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='accidents_idaccidents')
+
+    class Meta:
+        managed = False
+        db_table = 'lights'
+
+
+class UserHasAccidents(models.Model):
+    user_iduser = models.OneToOneField(User, models.DO_NOTHING, db_column='user_iduser', primary_key=True)  # The composite primary key (user_iduser, accidents_idaccidents) found, that is not supported. The first column is selected.
+    accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='accidents_idaccidents')
+
+    class Meta:
+        managed = False
+        db_table = 'user_has_accidents'
+        unique_together = (('user_iduser', 'accidents_idaccidents'),)

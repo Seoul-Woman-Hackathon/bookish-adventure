@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class MapConfig(AppConfig):
+class MapAlarmConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'map'
+    name = 'map_alarm'

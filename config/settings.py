@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.gis',
+    'map_alarm',
 ]
 
 MIDDLEWARE = [
@@ -73,15 +75,25 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.contrib.gis.db.backends.mysql',
+#         'HOST':  'kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com',
+#         'NAME': 'kids_guardian',
+#         'USER': 'root',
+#         'PASSWORD': 'jjw030903260',
+#         'PORT': '3306',
+#         'OPTIONS': {'charset': 'utf8mb4'},
+#     }
+# }
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'HOST':  'kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com',
-        'NAME': 'kids_guardian',
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
+        'HOST': 'db-kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com',
+        'PORT': '5432',
+        'NAME': 'kids-guardian',
         'USER': 'root',
-        'PASSWORD': 'jjw030903260',
-        'PORT': '3306',
-        'OPTIONS': {'charset': 'utf8mb4'},
+        'PASSWORD': 'jjw030903260'
     }
 }
 
