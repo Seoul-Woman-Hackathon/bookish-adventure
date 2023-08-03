@@ -2,19 +2,15 @@
 
 from django.http import JsonResponse
 from django.contrib.gis.geos import GEOSGeometry, Point
-import asyncio
-import aiohttp
 from urllib.parse import urlencode, quote_plus
-from asgiref.sync import sync_to_async
 from .models import Accidents, Lights
 import requests
-from django.shortcuts import HttpResponse
 import xmltodict
 import json
 
 serviceKeyDecoded = "9RY8CmSL7UQKCLU9pCbdmyY99NX3bVLENRuOONDYO9jqek29urc+15dvoFIg/rXD4q1VFdQh6o5ctlcDbbbC+g=="
 
-async def fetch_data_from_api(session, url, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns):
+def fetch_data_from_api(url, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns):
     for guGun in guGuns:
         for searchYearCd in range(2013, 2024):
             queryParams = '?' + urlencode({
@@ -27,45 +23,40 @@ async def fetch_data_from_api(session, url, serviceKeyDecoded, siDo, type_, numO
                 quote_plus('searchYearCd'): searchYearCd
             })
 
-            async with session.get(url + queryParams) as res:
-                if res.status == 200:
-                    # Read the response content as text
-                    response_text = await res.text()
+            res = requests.get(url + queryParams)
+            if res.status_code == 200:
+                response_text = res.text
 
+                try:
+                    data = json.loads(response_text)
+                except json.JSONDecodeError:
                     try:
-                        # Try parsing the response as JSON
-                        data = json.loads(response_text)
-                    except json.JSONDecodeError:
+                        data = xmltodict.parse(response_text)
+                    except xmltodict.expat.ExpatError:
+                        return JsonResponse({"message": "Failed to parse API response.", "status": "error"})
+
+                if "items" in data and "item" in data["items"]:
+                    items = data["items"]["item"]
+
+                    for item in items:
+                        geom_json = item["geom_json"]
+                        name = item["spot_nm"]
+                        region = GEOSGeometry(geom_json)
+
                         try:
-                            # If parsing as JSON fails, try parsing as XML
-                            data = xmltodict.parse(response_text)
-                        except xmltodict.expat.ExpatError:
-                            return JsonResponse({"message": "Failed to parse API response.", "status": "error"})
+                            polygon_obj, _ = Accidents.objects.get_or_create(name=name)
+                            polygon_obj.region = region
+                            polygon_obj.save()
+                        except Accidents.DoesNotExist:
+                            polygon_obj = Accidents(name=name, region=region)
+                            polygon_obj.save()
 
-                    # Now data should contain the parsed response (either JSON or XML)
-                    # Continue processing the data as before...
-                    if "items" in data and "item" in data["items"]:
-                        items = data["items"]["item"]
-
-                        for item in items:
-                            geom_json = item["geom_json"]
-                            name = item["spot_nm"]
-                            region = GEOSGeometry(geom_json)
-
-                            try:
-                                polygon_obj = await sync_to_async(Accidents.objects.get)(name=name)
-                                polygon_obj.region = region
-                                await sync_to_async(polygon_obj.save)()
-                            except Accidents.DoesNotExist:
-                                polygon_obj = await sync_to_async(Accidents)(name=name, region=region)
-                                await sync_to_async(polygon_obj.save)()
-
-                else:
-                    return JsonResponse({"message": "Failed to fetch data from the API.", "status": "error"})
+            else:
+                return JsonResponse({"message": "Failed to fetch data from the API.", "status": "error"})
 
     return True
 
-async def save_crosswalk_data_async(session, url, serviceKeyDecoded):
+def save_crosswalk_data(url, serviceKeyDecoded):
     url = "http://apis.data.go.kr/3190000/CrossWalkService/getCrossWalkList"
 
     params = {
@@ -74,52 +65,44 @@ async def save_crosswalk_data_async(session, url, serviceKeyDecoded):
         "numOfRows": "1000",  # Set the number of rows you want to fetch
     }
 
-    async with session.get(url, params=params) as response:
-        if response.status == 200:
-            # Check if the response content is not empty
-            response_text = await response.text()
-            if response_text:
-                try:
-                    data = json.loads(response_text)
-                    if "body" in data:
-                        crosswalks = data["body"]
-                        for crosswalk in crosswalks:
-                            try:
-                                latitude = crosswalk["LAT"]
-                                longitude = crosswalk["LOT"]
-                                road_address = crosswalk["LCTN_ROAD_NM_ADDR"]
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        response_text = response.text
+        if response_text:
+            try:
+                data = json.loads(response_text)
+                if "body" in data:
+                    crosswalks = data["body"]
+                    for crosswalk in crosswalks:
+                        try:
+                            latitude = crosswalk["LAT"]
+                            longitude = crosswalk["LOT"]
+                            road_address = crosswalk["LCTN_ROAD_NM_ADDR"]
 
-                                # Convert latitude and longitude to a Point object
-                                point = Point(longitude, latitude)
+                            point = Point(longitude, latitude)
 
-                                # Check if the point falls within any of the regions' polygons
-                                regions = Accidents.objects.filter(region__contains=point)
-                                if regions.exists():
-                                    # Get the first matching region (assuming there is only one)
-                                    region = regions.first()
+                            regions = Accidents.objects.filter(region__contains=point)
+                            if regions.exists():
+                                region = regions.first()
+                                Lights.objects.get_or_create(
+                                    latitude=latitude,
+                                    longitude=longitude,
+                                    name=road_address,
+                                    accidents_idaccidents=region,
+                                )
 
-                                    # Check if the record with the given latitude and longitude already exists for the region
-                                    # If not, save it to the database
-                                    Lights.objects.get_or_create(
-                                        latitude=latitude,
-                                        longitude=longitude,
-                                        name=road_address,
-                                        accidents_idaccidents=region,
-                                    )
+                        except KeyError:
+                            pass
 
-                            except KeyError:
-                                # Handle the case where the required fields are missing
-                                pass
-
-                    return "Data saved successfully."
-                except json.JSONDecodeError:
-                    return "Failed to parse API response as JSON."
-            else:
-                return "Empty response received from the API."
+                return "Data saved successfully."
+            except json.JSONDecodeError:
+                return "Failed to parse API response as JSON."
         else:
-            return "Failed to fetch data from the API."
+            return "Empty response received from the API."
+    else:
+        return "Failed to fetch data from the API."
 
-async def fetch_data_from_apis(request):
+def fetch_data_from_apis(request):
     url_bohang = "http://apis.data.go.kr/B552061/frequentzoneChild/getRestFrequentzoneChild"
     url_schoolzone = "http://apis.data.go.kr/B552061/schoolzoneChild/getRestSchoolzoneChild"
     siDo = "11"
@@ -129,13 +112,11 @@ async def fetch_data_from_apis(request):
 
     guGuns = ["710", "590"]
 
-    async with aiohttp.ClientSession() as session:
-        tasks = [
-            fetch_data_from_api(session, url_bohang, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns),
-            fetch_data_from_api(session, url_schoolzone, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns),
-            save_crosswalk_data_async(session, "http://apis.data.go.kr/3190000/CrossWalkService/getCrossWalkList", serviceKeyDecoded),
-        ]
-        results = await asyncio.gather(*tasks)
+    results = [
+        fetch_data_from_api(url_bohang, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns),
+        fetch_data_from_api(url_schoolzone, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns),
+        save_crosswalk_data("http://apis.data.go.kr/3190000/CrossWalkService/getCrossWalkList", serviceKeyDecoded),
+    ]
 
     # Process the results if needed
 
