@@ -12,7 +12,7 @@ from django.shortcuts import HttpResponse
 import xmltodict
 import json
 
-serviceKeyDecoded = "+THWNzZCVM8HYbGFp8GV2CPZjPEqQ+SqehbMQoQDEmuW7lR9JNUYwJtx3tolZ39qkQVZg0JgKrf3GAsaluhhEg=="
+serviceKeyDecoded = "9RY8CmSL7UQKCLU9pCbdmyY99NX3bVLENRuOONDYO9jqek29urc+15dvoFIg/rXD4q1VFdQh6o5ctlcDbbbC+g=="
 
 async def fetch_data_from_api(session, url, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns):
     for guGun in guGuns:
@@ -99,39 +99,44 @@ def save_crosswalk_data(request):
     response = requests.get(url, params=params)
 
     if response.status_code == 200:
-        data = response.json()
-        if "body" in data:
-            crosswalks = data["body"]
-            for crosswalk in crosswalks:
-                try:
-                    latitude = crosswalk["LAT"]
-                    longitude = crosswalk["LOT"]
-                    road_address = crosswalk["LCTN_ROAD_NM_ADDR"]
+        # Check if the response content is not empty
+        if response.content:
+            try:
+                data = response.json()
+                if "body" in data:
+                    crosswalks = data["body"]
+                    for crosswalk in crosswalks:
+                        try:
+                            latitude = crosswalk["LAT"]
+                            longitude = crosswalk["LOT"]
+                            road_address = crosswalk["LCTN_ROAD_NM_ADDR"]
 
-                    # Convert latitude and longitude to a Point object
-                    point = Point(longitude, latitude)
+                            # Convert latitude and longitude to a Point object
+                            point = Point(longitude, latitude)
 
-                    # Check if the point falls within any of the regions' polygons
-                    regions = Accidents.objects.filter(region__contains=point)
-                    if regions.exists():
-                        # Get the first matching region (assuming there is only one)
-                        region = regions.first()
+                            # Check if the point falls within any of the regions' polygons
+                            regions = Accidents.objects.filter(region__contains=point)
+                            if regions.exists():
+                                # Get the first matching region (assuming there is only one)
+                                region = regions.first()
 
-                        # Check if the record with the given latitude and longitude already exists for the region
-                        # If not, save it to the database
-                        Lights.objects.get_or_create(
-                            latitude=latitude,
-                            longitude=longitude,
-                            name=road_address,
-                            accidents_idaccidents=region,
-                        )
+                                # Check if the record with the given latitude and longitude already exists for the region
+                                # If not, save it to the database
+                                Lights.objects.get_or_create(
+                                    latitude=latitude,
+                                    longitude=longitude,
+                                    name=road_address,
+                                    accidents_idaccidents=region,
+                                )
 
-                except KeyError:
-                    # Handle the case where the required fields are missing
-                    pass
+                        except KeyError:
+                            # Handle the case where the required fields are missing
+                            pass
 
-            return HttpResponse("Data saved successfully.")
+                return HttpResponse("Data saved successfully.")
+            except json.JSONDecodeError:
+                return HttpResponse("Failed to parse API response as JSON.")
         else:
-            return HttpResponse("No data found in the response.")
+            return HttpResponse("Empty response received from the API.")
     else:
         return HttpResponse("Failed to fetch data from the API.")
