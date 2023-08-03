@@ -9,6 +9,8 @@ from asgiref.sync import sync_to_async
 from .models import Accidents,Lights
 import requests
 from django.shortcuts import HttpResponse
+import xmltodict
+import json
 
 serviceKeyDecoded = "+THWNzZCVM8HYbGFp8GV2CPZjPEqQ+SqehbMQoQDEmuW7lR9JNUYwJtx3tolZ39qkQVZg0JgKrf3GAsaluhhEg=="
 
@@ -27,7 +29,21 @@ async def fetch_data_from_api(session, url, serviceKeyDecoded, siDo, type_, numO
 
             async with session.get(url + queryParams) as res:
                 if res.status == 200:
-                    data = await res.json()
+                    # Read the response content as text
+                    response_text = await res.text()
+
+                    try:
+                        # Try parsing the response as JSON
+                        data = json.loads(response_text)
+                    except json.JSONDecodeError:
+                        try:
+                            # If parsing as JSON fails, try parsing as XML
+                            data = xmltodict.parse(response_text)
+                        except xmltodict.expat.ExpatError:
+                            return JsonResponse({"message": "Failed to parse API response.", "status": "error"})
+
+                    # Now data should contain the parsed response (either JSON or XML)
+                    # Continue processing the data as before...
                     if "items" in data and "item" in data["items"]:
                         items = data["items"]["item"]
 
