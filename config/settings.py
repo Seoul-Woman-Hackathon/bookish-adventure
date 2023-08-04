@@ -79,22 +79,22 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 #
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.contrib.gis.db.backends.mysql',
-#         'HOST':  'kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com',
-#         'NAME': 'kids_guardian',
-#         'USER': 'root',
-#         'PASSWORD': 'jjw030903260',
-#         'PORT': '3306',
-#         'OPTIONS': {'charset': 'utf8mb4'},
-#     }
-# }
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL', 'postgis://root:jjw030903260@db-kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com:5432/kids-guardian')
-    )
+    'default': {
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'NAME': 'kids-guardian',
+        'USER': 'root',
+        'PASSWORD': 'jjw030903260',
+        'HOST': 'db-kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com',
+        'PORT': '5432',
+    }
 }
+
+# DATABASES = {
+#     'default': dj_database_url.config(
+#         default=os.environ.get('DATABASE_URL', 'postgis://root:jjw030903260@db-kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com:5432/kids-guardian')
+#     )
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -142,3 +142,6 @@ DATABASES['default'].update(db_from_env)
 
 GDAL_LIBRARY_PATH = os.environ.get('GDAL_LIBRARY_PATH')
 GEOS_LIBRARY_PATH = os.environ.get('GEOS_LIBRARY_PATH')
+
+# DATABASES['default'] = dj_database_url.config()
+# DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
