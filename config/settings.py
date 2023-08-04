@@ -91,14 +91,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #     }
 # }
 DATABASES = {
-    'default': {
-        "ENGINE": "django.contrib.gis.db.backends.postgis",
-        'HOST': 'db-kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com',
-        'PORT': '5432',
-        'NAME': 'kids-guardian',
-        'USER': 'root',
-        'PASSWORD': 'jjw030903260'
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', 'postgis://root:jjw030903260@db-kids-guardian.cm3ah7zzqkkw.ap-northeast-2.rds.amazonaws.com:5432/kids-guardian')
+    )
 }
 
 # Password validation
