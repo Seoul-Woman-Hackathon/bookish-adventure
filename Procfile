@@ -1,1 +1,1 @@
-web: gunicorn config.wsgi –log-file -ㅔ
+web: gunicorn kids_guardian.wsgi –log-file -
