@@ -26,7 +26,7 @@ cryptography==41.0.3
 cycler==0.11.0
 daphne==4.0.0
 dj-database-url==2.0.0
-Django==4.2.1
+Django==4.2.4
 django-cors-headers==3.14.0
 django-crontab==0.7.1
 django-heroku==0.3.1
