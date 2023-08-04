@@ -95,8 +95,8 @@ def fetch_and_save_data(request):
 
     # latitude = float(request.GET.get('latitude', 0))
     # longitude = float(request.GET.get('longitude', 0))
-    latitude=0
-    longitude=0
+    latitude=37.5036009524
+    longitude=126.9609228327
     point = Point(longitude, latitude)
     accident = Accidents.objects.filter(region__contains=point).first()
 
