@@ -4,93 +4,99 @@ from urllib.parse import urlencode, quote_plus
 from .models import Accidents, Lights
 import requests
 import json
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 
-serviceKeyDecoded = "9RY8CmSL7UQKCLU9pCbdmyY99NX3bVLENRuOONDYO9jqek29urc+15dvoFIg/rXD4q1VFdQh6o5ctlcDbbbC+g=="
+SERVICE_KEY_DECODED = "9RY8CmSL7UQKCLU9pCbdmyY99NX3bVLENRuOONDYO9jqek29urc+15dvoFIg/rXD4q1VFdQh6o5ctlcDbbbC+g=="
+CROSSWALK_API_URL = "http://apis.data.go.kr/3190000/CrossWalkService/getCrossWalkList"
+FREQUENT_ZONE_API_URL = "http://apis.data.go.kr/B552061/frequentzoneChild/getRestFrequentzoneChild"
+SI_DO = "11"
+TYPE_ = "json"
+NUM_OF_ROWS = "100"
+PAGE_NO = "1"
+GU_GUNS = ["710", "590"]
 
+
+def fetch_data_from_api(url, params):
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        return response.json()
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        return None
+
+
+def save_accident_regions(gu_guns, service_key_decoded):
+    for gu_gun in gu_guns:
+        for search_year_cd in range(2013, 2024):
+            params = {
+                "ServiceKey": service_key_decoded,
+                "siDo": SI_DO,
+                "guGun": gu_gun,
+                "numOfRows": NUM_OF_ROWS,
+                "pageNo": PAGE_NO,
+                "type": TYPE_,
+                "searchYearCd": search_year_cd
+            }
+
+            data = fetch_data_from_api(FREQUENT_ZONE_API_URL, params)
+            if not data:
+                continue
+
+            for item in data.get("items", {}).get("item", []):
+                geom_json = item.get("geom_json")
+                name = item.get("spot_nm")
+                region = GEOSGeometry(geom_json)
+
+                existing_region = Accidents.objects.filter(name=name).first()
+                if not existing_region:
+                    polygon_obj, _ = Accidents.objects.get_or_create(name=name)
+                    polygon_obj.region = region
+                    polygon_obj.save()
+
+
+def save_traffic_lights(crosswalk_params, service_key_decoded):
+    crosswalk_data = fetch_data_from_api(CROSSWALK_API_URL, crosswalk_params)
+    if not crosswalk_data:
+        return
+
+    for crosswalk in crosswalk_data.get("body", []):
+        try:
+            latitude = crosswalk["LAT"]
+            longitude = crosswalk["LOT"]
+            road_address = crosswalk["LCTN_ROAD_NM_ADDR"]
+            point = Point(longitude, latitude)
+
+            existing_light = Lights.objects.filter(latitude=latitude, longitude=longitude).first()
+            regions = Accidents.objects.filter(region__contains=point)
+
+            if not existing_light and regions.exists():
+                region = regions.first()
+                Lights.objects.get_or_create(
+                    latitude=latitude,
+                    longitude=longitude,
+                    name=road_address,
+                    accidents_idaccidents=region
+                )
+        except KeyError:
+            pass
+
+
+@api_view(['GET','POST'])
 def fetch_and_save_data(request):
-    url_crosswalk = "http://apis.data.go.kr/3190000/CrossWalkService/getCrossWalkList"
-    url_bohang = "http://apis.data.go.kr/B552061/frequentzoneChild/getRestFrequentzoneChild"
-    siDo = "11"
-    type_ = "json"
-    numOfRows = "100"
-    pageNo = "1"
-    guGuns = ["710", "590"]
-
-    # Fetch and save crosswalk data
     crosswalk_params = {
-        "serviceKey": serviceKeyDecoded,
+        "serviceKey": SERVICE_KEY_DECODED,
         "pageNo": "1",
         "numOfRows": "1000",
     }
 
-    # Fetch and save traffic zone data
-    for guGun in guGuns:
-        for searchYearCd in range(2013, 2024):
-            queryParams = '?' + urlencode({
-                quote_plus('ServiceKey'): serviceKeyDecoded,
-                quote_plus('siDo'): siDo,
-                quote_plus('guGun'): guGun,
-                quote_plus('numOfRows'): numOfRows,
-                quote_plus('pageNo'): pageNo,
-                quote_plus('type'): type_,
-                quote_plus('searchYearCd'): searchYearCd
-            })
+    save_accident_regions(GU_GUNS, SERVICE_KEY_DECODED)
+    save_traffic_lights(crosswalk_params, SERVICE_KEY_DECODED)
 
-            res = requests.get(url_bohang + queryParams)
-            if res.status_code == 200:
-                try:
-                    data = res.json()
-                    items = data.get("items", {}).get("item", [])
-                    for item in items:
-                        geom_json = item.get("geom_json")
-                        name = item.get("spot_nm")
-                        region = GEOSGeometry(geom_json)
-
-                        # Check if the accident region with the same name exists in the database
-                        existing_region = Accidents.objects.filter(name=name).first()
-
-                        if not existing_region:
-                            # If the region with the same name does not exist, create a new one
-                            polygon_obj, _ = Accidents.objects.get_or_create(name=name)
-                            polygon_obj.region = region
-                            polygon_obj.save()
-                except json.JSONDecodeError:
-                    return JsonResponse({"message": "Failed to parse API response.", "status": "error"})
-            else:
-                return JsonResponse({"message": "Failed to fetch data from the API.", "status": "error"})
-    crosswalk_response = requests.get(url_crosswalk, params=crosswalk_params)
-    if crosswalk_response.status_code == 200:
-        try:
-            crosswalk_data = crosswalk_response.json()
-            crosswalks = crosswalk_data.get("body", [])
-            for crosswalk in crosswalks:
-                try:
-                    latitude = crosswalk["LAT"]
-                    longitude = crosswalk["LOT"]
-                    road_address = crosswalk["LCTN_ROAD_NM_ADDR"]
-                    point = Point(longitude, latitude)
-
-                    # Check if the traffic light with the same latitude and longitude exists in the database
-                    existing_light = Lights.objects.filter(latitude=latitude, longitude=longitude).first()
-                    regions = Accidents.objects.filter(region__contains=point)
-                    if not existing_light and regions.exists():
-                        region = regions.first()
-                        Lights.objects.get_or_create(
-                                    latitude=latitude,
-                                    longitude=longitude,
-                                    name=road_address,
-                                    accidents_idaccidents=region)
-                except KeyError:
-                    pass
-        except json.JSONDecodeError:
-            return JsonResponse({"message": "Failed to parse API response as JSON.", "status": "error"})
-    else:
-        return JsonResponse({"message": "Failed to fetch data from the API.", "status": "error"})
-
-    latitude = 37.5037158484
-    longitude = 126.9609764931
     # latitude = float(request.GET.get('latitude', 0))
     # longitude = float(request.GET.get('longitude', 0))
+    latitude=0
+    longitude=0
     point = Point(longitude, latitude)
     accident = Accidents.objects.filter(region__contains=point).first()
 
@@ -112,4 +118,4 @@ def fetch_and_save_data(request):
             'traffic_lights': []
         }
 
-    return JsonResponse(response_data)
+    return Response(response_data)

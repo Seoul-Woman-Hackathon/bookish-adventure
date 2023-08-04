@@ -35,6 +35,28 @@ class Accidents(models.Model):
         db_table = 'accidents'
 
 
+class Lights(models.Model):
+    idlights = models.AutoField(primary_key=True)
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
+    name = models.CharField(max_length=45, blank=True, null=True)
+    accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='accidents_idaccidents')
+
+    class Meta:
+        managed = False
+        db_table = 'lights'
+
+
+class UserHasAccidents(models.Model):
+    user_iduser = models.OneToOneField(User, models.DO_NOTHING, db_column='user_iduser', primary_key=True)  # The composite primary key (user_iduser, accidents_idaccidents) found, that is not supported. The first column is selected.
+    accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='accidents_idaccidents')
+
+    class Meta:
+        managed = False
+        db_table = 'user_has_accidents'
+        unique_together = (('user_iduser', 'accidents_idaccidents'),)
+
+
 class AuthGroup(models.Model):
     name = models.CharField(unique=True, max_length=150)
 
@@ -160,25 +182,3 @@ class Guardian(models.Model):
     class Meta:
         managed = False
         db_table = 'guardian'
-
-
-class Lights(models.Model):
-    idlights = models.AutoField(primary_key=True)
-    latitude = models.FloatField(blank=True, null=True)
-    longitude = models.FloatField(blank=True, null=True)
-    name = models.CharField(max_length=45, blank=True, null=True)
-    accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='accidents_idaccidents')
-
-    class Meta:
-        managed = False
-        db_table = 'lights'
-
-
-class UserHasAccidents(models.Model):
-    user_iduser = models.OneToOneField(User, models.DO_NOTHING, db_column='user_iduser', primary_key=True)  # The composite primary key (user_iduser, accidents_idaccidents) found, that is not supported. The first column is selected.
-    accidents_idaccidents = models.ForeignKey(Accidents, models.DO_NOTHING, db_column='accidents_idaccidents')
-
-    class Meta:
-        managed = False
-        db_table = 'user_has_accidents'
-        unique_together = (('user_iduser', 'accidents_idaccidents'),)
