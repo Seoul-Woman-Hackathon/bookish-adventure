@@ -35,7 +35,6 @@ djangorestframework-gis==0.18
 drf-yasg==1.21.5
 fonttools==4.39.4
 frozenlist==1.4.0
-GDAL==3.7.1
 gunicorn==21.2.0
 h11==0.14.0
 httpcore==0.17.3
