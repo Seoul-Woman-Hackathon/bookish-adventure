@@ -114,10 +114,50 @@ def fetch_data_from_apis(request):
 
     results = [
         fetch_data_from_api(url_bohang, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns),
-        fetch_data_from_api(url_schoolzone, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns),
+        #fetch_data_from_api(url_schoolzone, serviceKeyDecoded, siDo, type_, numOfRows, pageNo, guGuns),
         save_crosswalk_data("http://apis.data.go.kr/3190000/CrossWalkService/getCrossWalkList", serviceKeyDecoded),
     ]
 
     # Process the results if needed
 
     return JsonResponse({"message": "Data imported successfully.", "status": "success"})
+
+def find_traffic_lights(request):
+    if request.method == 'GET':
+        # latitude = float(request.GET.get('latitude', 0))
+        # longitude = float(request.GET.get('longitude', 0))
+        latitude=37.5037158484
+        longitude=126.9609764931
+        # Create a Point object from the given latitude and longitude
+        point = Point(longitude, latitude)
+
+        # Query the 'Accidents' table to find the matching region polygon
+        accident = Accidents.objects.filter(region__contains=point).first()
+
+        if accident:
+            # Get the traffic lights associated with the matching accident
+            traffic_lights = Lights.objects.filter(accidents_idaccidents=accident.idaccidents)
+
+            # Prepare the response in JSON format
+            response_data = {
+                'in_accident_region': True,
+                'traffic_lights': [
+                    {
+                        'id':light.idlights,
+                        'latitude': light.latitude,
+                        'longitude': light.longitude,
+                    }
+                    for light in traffic_lights
+                ]
+            }
+        else:
+            # If no matching accident is found, return an empty list for traffic lights
+            response_data = {
+                'in_accident_region': False,
+                'traffic_lights': []
+            }
+
+        return JsonResponse(response_data)
+
+    # Handle other HTTP methods if needed
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
