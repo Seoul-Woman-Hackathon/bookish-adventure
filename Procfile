@@ -1,1 +1,1 @@
-web: gunicorn kids_guardian.wsgi –log-file -
+web: gunicorn kids-guardian.wsgi --log-file - 
