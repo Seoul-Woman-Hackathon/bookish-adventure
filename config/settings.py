@@ -145,5 +145,5 @@ DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 GDAL_LIBRARY_PATH = os.environ.get('GDAL_LIBRARY_PATH')
 GEOS_LIBRARY_PATH = os.environ.get('GEOS_LIBRARY_PATH')
 
-CORS_ORIGIN_WHITELIST = ['https://kids-guardian-front.pages.dev/']
+CORS_ORIGIN_WHITELIST = ['*']
 CORS_ALLOW_CREDENTIALS = True

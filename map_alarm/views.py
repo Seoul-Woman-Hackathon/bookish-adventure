@@ -103,10 +103,10 @@ def fetch_and_save_data(request):
     # save_accident_regions(GU_GUNS, SERVICE_KEY_DECODED)
     # save_traffic_lights(crosswalk_params, SERVICE_KEY_DECODED)
 
-    # latitude = float(request.GET.get('latitude', 0))
-    # longitude = float(request.GET.get('longitude', 0))
-    latitude=37.5036009524
-    longitude=126.9609228327
+    latitude = float(request.GET.get('latitude', 0))
+    longitude = float(request.GET.get('longitude', 0))
+    # latitude=37.5036009524
+    # longitude=126.9609228327
     point = Point(longitude, latitude)
     accident = Accidents.objects.filter(region__contains=point).first()
 
