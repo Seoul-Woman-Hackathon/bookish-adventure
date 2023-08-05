@@ -100,8 +100,8 @@ def fetch_and_save_data(request):
         "numOfRows": "1000",
     }
 
-    save_accident_regions(GU_GUNS, SERVICE_KEY_DECODED)
-    save_traffic_lights(crosswalk_params, SERVICE_KEY_DECODED)
+    # save_accident_regions(GU_GUNS, SERVICE_KEY_DECODED)
+    # save_traffic_lights(crosswalk_params, SERVICE_KEY_DECODED)
 
     # latitude = float(request.GET.get('latitude', 0))
     # longitude = float(request.GET.get('longitude', 0))
