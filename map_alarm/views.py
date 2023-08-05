@@ -15,7 +15,7 @@ SI_DO = "11"
 TYPE_ = "json"
 NUM_OF_ROWS = "100"
 PAGE_NO = "1"
-GU_GUNS = ["710", "590"]
+GU_GUNS = ["710"]
 
 # 기존의 fetch_data_from_api 함수를 수정하여 캐싱을 적용합니다.
 def fetch_data_from_api(url, params):
