@@ -9,6 +9,7 @@ autobahn==23.6.2
 Automat==22.10.0
 beautifulsoup4==4.12.2
 billiard==4.1.0
+cache==1.0.3
 celery==5.3.1
 certifi==2023.5.7
 cffi==1.15.1

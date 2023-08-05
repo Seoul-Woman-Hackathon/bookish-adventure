@@ -6,6 +6,7 @@ import requests
 import json
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.core.cache import cache
 
 SERVICE_KEY_DECODED = "9RY8CmSL7UQKCLU9pCbdmyY99NX3bVLENRuOONDYO9jqek29urc+15dvoFIg/rXD4q1VFdQh6o5ctlcDbbbC+g=="
 CROSSWALK_API_URL = "http://apis.data.go.kr/3190000/CrossWalkService/getCrossWalkList"
@@ -16,14 +17,23 @@ NUM_OF_ROWS = "100"
 PAGE_NO = "1"
 GU_GUNS = ["710", "590"]
 
-
+# 기존의 fetch_data_from_api 함수를 수정하여 캐싱을 적용합니다.
 def fetch_data_from_api(url, params):
+    cache_key = f"api:{url}?{urlencode(params)}"
+    cached_response = cache.get(cache_key)
+    if cached_response:
+        return cached_response
+
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 캐시 유효 기간을 설정하고 응답을 캐싱합니다.
+        cache.set(cache_key, json_data, timeout=60 * 15)  # 15분간 유효한 캐시
+        return json_data
     except (requests.RequestException, json.JSONDecodeError) as e:
         return None
+
 
 
 def save_accident_regions(gu_guns, service_key_decoded):
