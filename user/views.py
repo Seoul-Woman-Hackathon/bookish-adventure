@@ -1,61 +1,57 @@
-from datetime import datetime
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
-from rest_framework.authtoken.models import Token
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login, logout
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from .models import User
 
 
-@api_view(["POST"])
+@csrf_exempt
 def signup(request):
     if request.method == "POST":
-        data = request.data
-        email = data["email"]
+        print(request)
+        email = request.POST.get("email")
+        password = request.POST.get("password")
+        birthdate = request.POST.get("birthdate")
+        phonenum = request.POST.get("phonenum")
+        name = request.POST.get("name")
 
         if User.objects.filter(email=email).exists():
-            return Response(
-                {"error": "User with this email already exists"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return JsonResponse({"message": "Email already exists"}, status=400)
 
-        hashed_password = make_password(data["password"])
-        now = datetime.now()
-
+        hashed_password = make_password(password)
         user = User(
-            name=data["name"],
             email=email,
-            birthdate=data["birthdate"],
-            phonenum=data["phonenum"],
             password=hashed_password,
-            created_at=now,
-            updated_at=now,
+            name=name,
+            phonenum=phonenum,
+            birthdate=birthdate,
         )
         user.save()
-        return Response(
-            {"message": "User created successfully"}, status=status.HTTP_201_CREATED
-        )
+        return JsonResponse({"message": "Signup successful"}, status=201)
+    else:
+        return JsonResponse({"message": "Invalid request"}, status=400)
 
 
-@api_view(["POST"])
-def login(request):
+@csrf_exempt
+def user_login(request):
     if request.method == "POST":
-        data = request.data
-        user = authenticate(username=data["email"], password=data["password"])
-        if user:
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({"token": token.key})
+        email = request.POST.get("email")
+        password = request.POST.get("password")
+
+        user = authenticate(request, email=email, password=password)
+        if user is not None:
+            login(request, user)
+            return JsonResponse({"message": "Login successful"})
         else:
-            return Response(
-                {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
-            )
+            return JsonResponse({"message": "Login failed"}, status=401)
+    else:
+        return JsonResponse({"message": "Invalid request"}, status=400)
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def logout(request):
+@csrf_exempt
+def user_logout(request):
     if request.method == "POST":
-        request.auth.delete()
-        return Response({"message": "Logged out successfully"})
+        logout(request)
+        return JsonResponse({"message": "Logout successful"})
+    else:
+        return JsonResponse({"message": "Invalid request"}, status=400)

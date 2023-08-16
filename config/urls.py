@@ -22,9 +22,3 @@ urlpatterns = [
     path("map/", include("map_alarm.urls")),
     path("user/", include("user.urls")),
 ]
-
-# 로그인 성공후 이동하는 URL
-LOGIN_REDIRECT_URL = "/"
-
-# 로그아웃시 이동하는 URL
-LOGOUT_REDIRECT_URL = "/"

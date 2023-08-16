@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "django.contrib.gis",
     "map_alarm",
     "rest_framework",
+    "rest_framework.authtoken",
     "user",
 ]
 
@@ -151,3 +152,17 @@ GEOS_LIBRARY_PATH = os.environ.get("GEOS_LIBRARY_PATH")
 
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        # 다른 인증 클래스도 여기에 추가할 수 있습니다.
+    ],
+    # 다른 설정들도 있을 수 있습니다.
+}
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",  # 기본 백엔드
+    "user.backends.CustomUserBackend",  # 커스텀 백엔드 추가
+]
+AUTH_USER_MODEL = "user.User"  # 실제 사용하는 커스텀 사용자 모델의 경로로 변경
