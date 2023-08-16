@@ -3,12 +3,12 @@ from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import User
+from rest_framework.views import APIView
 
 
 @csrf_exempt
 def signup(request):
     if request.method == "POST":
-        print(request)
         email = request.POST.get("email")
         password = request.POST.get("password")
         birthdate = request.POST.get("birthdate")
@@ -55,3 +55,12 @@ def user_logout(request):
         return JsonResponse({"message": "Logout successful"})
     else:
         return JsonResponse({"message": "Invalid request"}, status=400)
+
+
+class CountView(APIView):
+    def get(self, request, iduser):
+        try:
+            count = User.objects.filter(iduser=iduser).count()
+            return JsonResponse({"count": count})
+        except User.DoesNotExist:
+            return JsonResponse({"error": "User not found"}, status=404)
