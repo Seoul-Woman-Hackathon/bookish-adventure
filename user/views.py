@@ -15,6 +15,8 @@ def signup(request):
         phonenum = request.POST.get("phonenum")
         name = request.POST.get("name")
 
+        if not (email and password and birthdate and phonenum and name):
+            return JsonResponse({"message": "All fields are required"}, status=400)
         if User.objects.filter(email=email).exists():
             return JsonResponse({"message": "Email already exists"}, status=400)
 
