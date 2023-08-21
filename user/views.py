@@ -1,65 +1,67 @@
-from django.contrib.auth import get_user_model
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from .models import CustomToken
+from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from .models import User
+from .serializers import UserSerializer
+from rest_framework.views import APIView
 
-User = get_user_model()
+
+@api_view(["POST"])
+def signup(request):
+    if request.method == "POST":
+        serializer = UserSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            if User.objects.filter(email=email).exists():
+                return Response(
+                    {"error": "This email is already registered"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            password = serializer.validated_data["password"]
+            user = serializer.save()
+            user.set_password(password)  # Set the password explicitly
+            user.save()  # Save the user object with the updated password
+
+            token, created = Token.objects.get_or_create(user=user)
+            return Response(
+                {"token": token.key},
+                status=status.HTTP_201_CREATED,
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class SignupView(APIView):
-    def post(self, request):
+@api_view(["POST"])
+def login_view(request):
+    if request.method == "POST":
         email = request.data.get("email")
         password = request.data.get("password")
-        birthdate = request.data.get("birthdate")
-        phonenum = request.data.get("phonenum")
-        name = request.data.get("name")
-
-        if not (email and password and birthdate and phonenum and name):
-            return Response(
-                {"message": "All fields are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if User.objects.filter(email=email).exists():
-            return Response(
-                {"message": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Create the user and set the password using the set_password method
-        user = User(
-            email=email,
-            name=name,
-            phonenum=phonenum,
-            birthdate=birthdate,
-        )
-        user.set_password(password)
-        user.save()
-
-        # Create or retrieve the token associated with the user
-        token, _ = CustomToken.objects.get_or_create(user=user)
-        return Response({"token": token.key}, status=status.HTTP_201_CREATED)
-
-
-class LoginView(APIView):
-    def post(self, request):
-        email = request.data.get("email")
-        password = request.data.get("password")
-
         user = authenticate(request, email=email, password=password)
+
         if user is not None:
-            token, _ = CustomToken.objects.get_or_create(user=user)
-            return Response({"token": token.key, "message": "Login successful"})
-        else:
-            return Response(
-                {"message": "Login failed"}, status=status.HTTP_401_UNAUTHORIZED
-            )
+            login(request, user)
+            token, created = Token.objects.get_or_create(user=user)
+            return Response({"token": token.key})
+
+        return Response(
+            {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
+        )
 
 
-class LogoutView(APIView):
-    def post(self, request):
-        request.auth.delete()  # Delete the token associated with the current user
-        return Response({"message": "Logout successful"})
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    if request.method == "POST":
+        request.auth.delete()  # Delete the token upon logout
+        logout(request)
+        return Response(
+            {"message": "Logged out successfully"}, status=status.HTTP_200_OK
+        )
 
 
 class CountView(APIView):

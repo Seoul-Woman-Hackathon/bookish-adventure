@@ -30,7 +30,7 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    iduser = models.AutoField(primary_key=True)
+    iduser = models.AutoField(primary_key=True, db_column="iduser")
     email = models.EmailField(max_length=100, unique=True)
     name = models.CharField(max_length=100)
     birthdate = models.DateField()
