@@ -1,68 +1,74 @@
-from django.contrib.auth.hashers import make_password
-from django.contrib.auth import authenticate, login, logout
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from .models import User
+from django.contrib.auth import get_user_model
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from .models import CustomToken
+
+User = get_user_model()
 
 
-@csrf_exempt
-def signup(request):
-    if request.method == "POST":
-        email = request.POST.get("email")
-        password = request.POST.get("password")
-        birthdate = request.POST.get("birthdate")
-        phonenum = request.POST.get("phonenum")
-        name = request.POST.get("name")
+class SignupView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        password = request.data.get("password")
+        birthdate = request.data.get("birthdate")
+        phonenum = request.data.get("phonenum")
+        name = request.data.get("name")
 
         if not (email and password and birthdate and phonenum and name):
-            return JsonResponse({"message": "All fields are required"}, status=400)
+            return Response(
+                {"message": "All fields are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if User.objects.filter(email=email).exists():
-            return JsonResponse({"message": "Email already exists"}, status=400)
+            return Response(
+                {"message": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
-        hashed_password = make_password(password)
+        # Create the user and set the password using the set_password method
         user = User(
             email=email,
-            password=hashed_password,
             name=name,
             phonenum=phonenum,
             birthdate=birthdate,
         )
+        user.set_password(password)
         user.save()
-        return JsonResponse({"message": "Signup successful"}, status=201)
-    else:
-        return JsonResponse({"message": "Invalid request"}, status=400)
+
+        # Create or retrieve the token associated with the user
+        token, _ = CustomToken.objects.get_or_create(user=user)
+        return Response({"token": token.key}, status=status.HTTP_201_CREATED)
 
 
-@csrf_exempt
-def user_login(request):
-    if request.method == "POST":
-        email = request.POST.get("email")
-        password = request.POST.get("password")
+class LoginView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        password = request.data.get("password")
 
         user = authenticate(request, email=email, password=password)
         if user is not None:
-            login(request, user)
-            return JsonResponse({"message": "Login successful"})
+            token, _ = CustomToken.objects.get_or_create(user=user)
+            return Response({"token": token.key, "message": "Login successful"})
         else:
-            return JsonResponse({"message": "Login failed"}, status=401)
-    else:
-        return JsonResponse({"message": "Invalid request"}, status=400)
+            return Response(
+                {"message": "Login failed"}, status=status.HTTP_401_UNAUTHORIZED
+            )
 
 
-@csrf_exempt
-def user_logout(request):
-    if request.method == "POST":
-        logout(request)
-        return JsonResponse({"message": "Logout successful"})
-    else:
-        return JsonResponse({"message": "Invalid request"}, status=400)
+class LogoutView(APIView):
+    def post(self, request):
+        request.auth.delete()  # Delete the token associated with the current user
+        return Response({"message": "Logout successful"})
 
 
 class CountView(APIView):
     def get(self, request, iduser):
         try:
+            user = User.objects.get(pk=iduser)
             count = User.objects.filter(iduser=iduser).count()
-            return JsonResponse({"count": count})
+            return Response({"user": user.name, "count": count})
         except User.DoesNotExist:
-            return JsonResponse({"error": "User not found"}, status=404)
+            return Response(
+                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+            )
